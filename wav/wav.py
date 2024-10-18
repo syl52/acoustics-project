@@ -1,8 +1,10 @@
 import wave
 
 import numpy as np
-from wav_helpers import remove_ambient_noise, calculate_rt60, bandpass_filter, get_prominent_frequencies
-from wav_graphers import plot_rt60_vs_frequency
+
+from wav.wav_graphers import plot_rt60_vs_frequency
+from wav.wav_helpers import remove_ambient_noise, calculate_rt60, bandpass_filter, get_prominent_frequencies
+
 
 class Wav:
     """Class representation for Wav files."""
@@ -63,10 +65,7 @@ class Wav:
         for freq in prominent_freqs:
             filtered_audio = bandpass_filter(processed_audio, freq, self.frame_rate)
             rt60 = calculate_rt60(filtered_audio, self.frame_rate)
-            if rt60:
-                rt60_values.append(rt60)
+            rt60_values.append(rt60)
 
         # Step 5: Plot RT60 as a function of frequency
         plot_rt60_vs_frequency(prominent_freqs, rt60_values)
-
-
