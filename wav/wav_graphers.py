@@ -1,3 +1,5 @@
+from typing import Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -13,7 +15,7 @@ def plot_fft_frequencies(frequencies: np.ndarray, fft_magnitudes: np.ndarray) ->
     plt.show()
 
 
-def plot_rt60_vs_frequency(prominent_freqs: np.ndarray | list[float], rt60_values: np.ndarray | list[float]) -> None:
+def plot_rt60_vs_frequency(prominent_freqs: Union[np.ndarray, list[float]], rt60_values: Union[np.ndarray, list[float]]) -> None:
     """Plot RT60 as a function of frequency."""
     plt.figure(figsize=(10, 6))
     plt.plot(prominent_freqs, rt60_values, 'o-')
