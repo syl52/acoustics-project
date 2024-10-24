@@ -25,17 +25,19 @@ class SoundGeneration:
             assert isinstance(i, float) or isinstance(i, int), \
                 "Frequency must be float or int"
         assert self.on >= 3, "On must be greater than 3 s"
-        assert self.off >= 5, "Off must be greater than 5 s"
+        assert self.off >= 3, "Off must be greater than 5 s"
 
     def play(self) -> None:
         """Plays the sound."""
-        
+
         for f in self.freqs:
             print(f"\nNow playing frequency {f} Hz:")
-            winsound.Beep(f, self.on * 1000)  # NB this time in ms
+            winsound.Beep(int(f), int(self.on * 1000))  # NB this time in ms
             print(f"Done playing frequency {f} Hz, sleeping {self.off} "
                   f"seconds.")
             time.sleep(self.off)  # NB this time in s
+
+        print("Done playing all.")
 
     def get_predicted_time(self) -> float:
         """Returns the predicted time for a single complete play."""
