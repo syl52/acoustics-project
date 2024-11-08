@@ -11,7 +11,7 @@ class SoundGeneration:
                  on: Union[float, int] = 5, off: Union[float, int] = 5):
         """
         :param freqs: list of frequencies to be tested
-        :param on: on time in seconds
+        :param on: minimum on time in seconds
         :param off: off time in seconds
         """
         self.freqs = freqs
@@ -27,22 +27,33 @@ class SoundGeneration:
         assert self.on >= 3, "On must be greater than 3 s"
         assert self.off >= 3, "Off must be greater than 5 s"
 
+    def _calculate_play_duration(self, frequency: float) -> int:
+        """Calculate a play duration (in ms) that is a multiple of the period."""
+        period = 1 / frequency  # Period in seconds
+        cycles_needed = int(
+            self.on / period) + 1  # Minimum integer cycles to exceed on-time
+        duration = cycles_needed * period  # Total duration in seconds
+        return int(duration * 1000)  # Convert to milliseconds
+
     def play(self) -> None:
-        """Plays the sound."""
+        """Plays each frequency with a smooth zero-ending cycle."""
 
         for f in self.freqs:
-            print(f"\nNow playing frequency {f} Hz:")
-            winsound.Beep(int(f), int(self.on * 1000))  # NB this time in ms
-            print(f"Done playing frequency {f} Hz, sleeping {self.off} "
-                  f"seconds.")
-            time.sleep(self.off)  # NB this time in s
+            play_duration = self._calculate_play_duration(f)
+            print(
+                f"\nNow playing frequency {f} Hz for {play_duration / 1000:.2f} seconds:")
+            winsound.Beep(int(f),
+                          play_duration)  # Play the beep for calculated duration
+            print(
+                f"Done playing frequency {f} Hz, sleeping for {self.off} seconds.")
+            time.sleep(self.off)  # Rest between notes
 
-        print("Done playing all.")
+        print("Done playing all frequencies.")
 
     def get_predicted_time(self) -> float:
-        """Returns the predicted time for a single complete play."""
-        counter = 0
-        counter += (len(self.freqs) * self.on)
-        counter += ((len(self.freqs) - 1) * self.off)
-        print(f"Predicted time is {round(counter)} seconds.")
-        return counter
+        """Returns the predicted total play time, including pauses between frequencies."""
+        total_time = sum(
+            self._calculate_play_duration(f) / 1000 for f in self.freqs) + (
+                             len(self.freqs) - 1) * self.off
+        print(f"Predicted total time: {round(total_time)} seconds.")
+        return total_time
