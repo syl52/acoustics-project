@@ -1,6 +1,4 @@
-import time
-
-from pysinewave import SineWave
+from generation.sound_generation import SoundGeneration
 
 OCTAVES = [64, 128, 256, 512, 1024, 2048]
 
@@ -21,11 +19,10 @@ ALL.append(2093.005)
 assert len(ALL) == 31
 
 if __name__ == '__main__':
-    sinewave = SineWave(pitch_per_second=10000)
-    sinewave.set_frequency(400)
-    sinewave.play()
-    time.sleep(3.000625)
-    sinewave.stop()
+    # Initialize SoundGeneration with decay method
+    sound_gen = SoundGeneration(freqs=[400], on=3,
+                                off=3)
+    sound_gen.play_with_decay(decay_rate=0.9)  # Adjust decay_rate as desired
 """
     octave_playthrough = SoundGeneration(OCTAVES, 3, 3)
     octave_playthrough.get_predicted_time()
