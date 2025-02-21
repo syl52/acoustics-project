@@ -31,6 +31,10 @@ def plot_rt60_vs_frequency(prominent_freqs: Union[np.ndarray, list[float]],
     plt.show()
 
 
+def convert_to_db(array):
+    return 20 * np.log10(np.abs(array) / np.max(np.abs(array)) + 1e-12)
+
+
 def plot_time_domain_form(audio_array: np.ndarray, sample_rate: int) -> None:
     """Plot the time-domain representation of the audio signal in dB scale."""
     # Check if audio is stereo or mono
@@ -39,13 +43,8 @@ def plot_time_domain_form(audio_array: np.ndarray, sample_rate: int) -> None:
     else:  # Mono
         num_channels = 1
 
-    # Convert to dB scale
-    def convert_to_db(array):
-        return 20 * np.log10(np.abs(array) / np.max(np.abs(array)) + 1e-12)
-
     time_axis = np.linspace(0, len(audio_array) / sample_rate,
                             len(audio_array))
-
     # Plot each channel on a separate subplot
     plt.figure(figsize=(12, 4 * num_channels))
     for i in range(num_channels):
@@ -84,9 +83,6 @@ def regress_and_plot_time_domain(
         audio_array = audio_array[:,
                       np.newaxis]  # Reshape to 2D for uniform processing
 
-    def convert_to_db(array):
-        return 20 * np.log10(np.abs(array) / np.max(np.abs(array)) + 1e-12)
-
     time_axis = np.linspace(0, len(audio_array) / sample_rate,
                             len(audio_array))
 
@@ -118,7 +114,7 @@ def regress_and_plot_time_domain(
 
             # Find peaks in the region, prominence 5dB Change this!
             peaks, _ = find_peaks(region_db,
-                                  prominence=2,
+                                  prominence=3.5,
                                   distance=int(0.02 * sample_rate),
                                   )
             # min distance of peaks 0.02 seconds converted to samples
