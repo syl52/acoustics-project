@@ -42,5 +42,6 @@ if __name__ == "__main__":
 
         regress_and_plot_time_domain(temp_wav.audio_array,
                                      temp_wav.frame_rate,
-                                     get_config(f_name)
+                                     get_config(f_name),
+                                     f_name
                                      )

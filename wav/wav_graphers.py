@@ -64,12 +64,14 @@ def plot_time_domain_form(audio_array: np.ndarray, sample_rate: int) -> None:
 def regress_and_plot_time_domain(
         audio_array: np.ndarray,
         sample_rate: int,
-        regions: list[list[tuple[float, float]]]
+        regions: list[list[tuple[float, float]]],
+        f_name: str
 ) -> None:
     """
     Analyse and plot the time-domain representation of the audio signal in
     dB scale, with regression lines for specified regions.
 
+    :param f_name: File name, used in chart title
     :param audio_array: The audio data as a numpy array.
     :param sample_rate: Sampling rate of the audio file.
     :param regions: List of lists where each sublist corresponds to one channel,
@@ -97,7 +99,7 @@ def regress_and_plot_time_domain(
         plt.subplot(num_channels, 1, i + 1)
         plt.plot(time_axis, audio_db, label=f"Channel {i + 1}", alpha=0.5)
         plt.ylim(-60, 0)
-        plt.title(f"Channel {i + 1} (dB Scale)")
+        plt.title(f"{f_name}/ Channel {i + 1} (dB Scale)")
         plt.xlabel("Time (seconds)")
         plt.ylabel("Amplitude (dB)")
         plt.grid(True)
