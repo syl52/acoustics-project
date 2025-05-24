@@ -200,12 +200,11 @@ def calculate_and_plot_c80(
                             len(audio_array))
     plt.figure(figsize=(12, 4 * num_channels))
 
-    print("Channel, Start(s), End(s), C80 (dB)")
+    print("Channel, Start(s), Calculated_End(s), C80 (dB)")
 
     for i in range(num_channels):
         signal = audio_array[:, i]
-        signal_abs = np.abs(signal)
-        signal_db = convert_to_db(signal_abs)
+        signal_db = convert_to_db(signal)
         plt.subplot(num_channels, 1, i + 1)
         plt.plot(time_axis, signal_db, label=f"Channel {i + 1}", alpha=0.6)
         plt.ylim(-60, 0)
@@ -214,15 +213,50 @@ def calculate_and_plot_c80(
         plt.ylabel("Amplitude (dB)")
         plt.grid(True)
 
-        for t_start, t_end in regions[i]:
-            start_idx = int(t_start * sample_rate)
-            end_idx = int(t_end * sample_rate)
-            split_idx = start_idx + int(0.08 * sample_rate)  # 80 ms later
+        for t_start_original, t_end_original in regions[i]:
+            start_idx = int(t_start_original * sample_rate)
+            # end_idx is now determined dynamically
 
+            window_size = 1000  # samples for rolling average
+            threshold_db = -40  # threshold in dB for end of decay
+            max_search_duration = 2  # decay should definitely be gone by now
+            max_search_idx = start_idx + int(max_search_duration * sample_rate)
+            max_search_idx = min(max_search_idx, len(signal_db))
+
+            # Calculate rolling average in dB
+            # Pad the signal_db to handle the beginning of the rolling window
+            padded_signal_db = np.pad(signal_db, (window_size - 1, 0),
+                                      mode='edge')
+            rolling_avg_db = np.convolve(padded_signal_db,
+                                         np.ones(window_size) / window_size,
+                                         mode='valid')
+
+            # Find first index where rolling average drops below the threshold
+            search_start_idx = start_idx
+            decay_end_idx = -1  # -1 to indicate not found
+            for j in range(search_start_idx, max_search_idx):
+                if j < len(rolling_avg_db) and rolling_avg_db[
+                    j] < threshold_db:
+                    decay_end_idx = j
+                    break
+
+            if decay_end_idx == -1 or decay_end_idx <= start_idx:
+                print(
+                    f"Channel {i + 1}, Region {t_start_original:.4f}s: Decay below {threshold_db}dB not found or occurs before start within {max_search_duration}s window. Using original t_end.")
+                # If decay not found or too early, use the original t_end
+                t_end = t_end_original
+                end_idx = int(t_end * sample_rate)
+            else:
+                t_end = decay_end_idx / sample_rate
+                end_idx = decay_end_idx
+
+            split_idx = start_idx + int(0.08 * sample_rate)
+
+            # Check if the calculated end_idx is before the 80ms split_idx
             if split_idx >= end_idx:
                 print(
-                    f"Channel {i + 1}, Region {t_start}-{t_end}s: too short for 80 ms window.")
-                continue
+                    f"Channel {i + 1}, Region {t_start_original}-{t_end:.4f}s: too short for 80 ms window after re-evaluating end time. Skipping C80 for this region.")
+                continue  # Skip C80 calculation for this region
 
             signal_region = signal[start_idx:end_idx]
             signal_squared = signal_region ** 2
@@ -232,35 +266,35 @@ def calculate_and_plot_c80(
 
             if late_energy == 0:
                 print(
-                    f"Channel {i + 1}, Region {t_start}-{t_end}s: late energy is zero.")
+                    f"Channel {i + 1}, Region {t_start_original}-{t_end:.4f}s: late energy is zero. Cannot calculate C80.")
                 continue
 
-            C80 = 10 * np.log10(early_energy / late_energy)
+            if early_energy == 0:
+                C80 = -np.inf
+            else:
+                C80 = 10 * np.log10(early_energy / late_energy)
 
-            print(f"{i + 1},       {t_start:.4f},  {t_end:.4f},  {C80:.2f} dB")
+            print(
+                f"{i + 1},       {t_start_original:.4f},  {t_end:.4f},  {C80:.2f}")
 
-            # Flags to add legend labels only once per type
-            label_flags = {'start': True, '80ms': True, 'end': True}
+            label_flags = {'start': True, '80ms': True, 'calculated_end': True}
 
-            for t_start, t_end in regions[i]:
-                ...
-                # Plot vertical lines with labels only once
-                plt.axvline(x=t_start, color='g', linestyle='--',
-                            label='Start of Decay' if label_flags[
-                                'start'] else None)
-                label_flags['start'] = False
+            # Plot vertical lines with labels
+            plt.axvline(x=t_start_original, color='g', linestyle='--',
+                        label='Start of Decay' if label_flags[
+                            'start'] else None)
+            label_flags['start'] = False
 
-                plt.axvline(x=t_start + 0.08, color='r', linestyle='--',
-                            label='End of 80 ms' if label_flags['80ms'] else
-                            None)
-                label_flags['80ms'] = False
+            plt.axvline(x=t_start_original + 0.08, color='r', linestyle='--',
+                        label='End of 80 ms' if label_flags['80ms'] else None)
+            label_flags['80ms'] = False
 
-                plt.axvline(x=t_end, color='k', linestyle='--',
-                            label='End of Decay' if label_flags[
-                                'end'] else None)
-                label_flags['end'] = False
+            plt.axvline(x=t_end, color='black', linestyle='--',
+                        label='Calculated End of Decay' if label_flags[
+                            'calculated_end'] else None)
+            label_flags['calculated_end'] = False
 
-        # Manually filter duplicate legend entries
+        # Manually filter duplicate legend entries for the current subplot
         handles, labels = plt.gca().get_legend_handles_labels()
         unique = dict()
         for h, l in zip(handles, labels):
