@@ -1,3 +1,4 @@
+import importlib
 import os
 from typing import Optional
 
@@ -96,3 +97,20 @@ def get_wav_files_from_folder(folder_path: str) -> list[str]:
             if file.endswith(".wav"):
                 wav_files.append(os.path.join(root, file))
     return wav_files
+
+
+def get_config(file_name: str, config_module: str =
+"regression_start_end_times") -> list:
+    """
+    Fetch the corresponding list from the configuration module
+    based on the file name.
+
+    :param file_name: Name of the file to match.
+    :param config_module: Module where lists are stored.
+    :return: Matching list if found, else None.
+    """
+    # Dynamically import the config module
+    config = importlib.import_module(config_module)
+
+    # Attempt to fetch the corresponding list
+    return getattr(config, file_name, None)
