@@ -4,7 +4,8 @@ from wav.wav_helpers import get_wav_files_from_folder, get_config
 
 if __name__ == "__main__":
 
-    folder_path = r"C:\Users\Shawn\PycharmProjects\acoustics-project\audio-files"
+    folder_path = (r"C:\Users\Shawn\PycharmProjects\acoustics-project\audio"
+                   r"-files-single")
 
     # Get wav files
     ALL: list[str] = get_wav_files_from_folder(folder_path)

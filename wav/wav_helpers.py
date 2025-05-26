@@ -5,7 +5,11 @@ from typing import Optional
 import numpy as np
 from scipy.fftpack import fft
 from scipy.ndimage import uniform_filter1d
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, butter, filtfilt
+
+
+def convert_to_db(array):
+    return 20 * np.log10(np.abs(array) / np.max(np.abs(array)) + 1e-12)
 
 
 def remove_ambient_noise(audio_data: np.ndarray, frame_rate: int, ambient_duration: float) -> np.ndarray:
@@ -44,17 +48,24 @@ def calculate_rt60(audio_data: np.ndarray, sample_rate: int) -> Optional[float]:
 
 
 def bandpass_filter(audio_data: np.ndarray, target_freq: float, sample_rate: int, bandwidth: float = 50) -> np.ndarray:
-    """Apply a simple bandpass filter to isolate the target frequency."""
-    n = len(audio_data)
-    fft_data = fft(audio_data)
-    freqs = np.fft.fftfreq(n, 1 / sample_rate)
+    """
+    Apply a Butterworth bandpass filter using filtfilt for zero-phase distortion.
 
-    # Bandpass filter mask
-    filter_mask = (np.abs(freqs - target_freq) <= bandwidth)
-    filtered_fft = fft_data * filter_mask
+    :param audio_data: Time-domain signal.
+    :param target_freq: Centre frequency in Hz.
+    :param sample_rate: Sampling rate of signal.
+    :param bandwidth: Bandwidth around the centre frequency in Hz.
+    :return: Bandpass filtered signal.
+    """
+    nyquist = 0.5 * sample_rate
+    low = (target_freq - bandwidth / 2) / nyquist
+    high = (target_freq + bandwidth / 2) / nyquist
 
-    # Inverse FFT to get filtered audio
-    filtered_audio = np.fft.ifft(filtered_fft).real
+    if low <= 0:
+        low = 1e-5  # Prevent invalid filter
+
+    b, a = butter(N=4, Wn=[low, high], btype='band')
+    filtered_audio = filtfilt(b, a, audio_data)
     return filtered_audio
 
 
@@ -87,6 +98,32 @@ def get_prominent_frequencies(audio_data: np.ndarray, sample_rate: int, min_freq
     rounded_freqs = np.round(filtered_freqs).astype(int)
 
     return rounded_freqs
+
+
+def calculate_bandwise_rt60s(audio_data: np.ndarray, sample_rate: int) -> dict:
+    """
+    Calculate RT60 for octave-spaced frequency bands from 64 Hz to 2048 Hz.
+
+    Parameters:
+        :param audio_data: (np.ndarray): Input audio signal (1D).
+        :param sample_rate: (int): Sampling rate in Hz.
+
+    Returns:
+        dict: Mapping of center frequency to RT60 value (in seconds), or None if not measurable.
+    """
+    target_freqs = [64, 128, 256, 512, 1024, 2048]
+    # same freqs as in single-freq tests
+    rt60_results = {}
+
+    for freq in target_freqs:
+        filtered = bandpass_filter(audio_data, freq, sample_rate,
+                                   bandwidth=freq * 0.25)
+        # 32 Hz lower limit BW for stability - this is fine since we only go
+        # down to 64 Hz
+        rt60 = calculate_rt60(filtered, sample_rate)
+        rt60_results[freq] = rt60
+
+    return rt60_results
 
 
 def get_wav_files_from_folder(folder_path: str) -> list[str]:

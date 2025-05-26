@@ -2,7 +2,9 @@ from typing import Union
 
 import matplotlib as mpl
 
-mpl.rcParams['agg.path.chunksize'] = 10000
+from wav.wav_helpers import convert_to_db, bandpass_filter, get_config
+
+mpl.rcParams['agg.path.chunksize'] = 10000  # stops errors
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks
@@ -34,8 +36,6 @@ def plot_rt60_vs_frequency(prominent_freqs: Union[np.ndarray, list[float]],
     plt.show()
 
 
-def convert_to_db(array):
-    return 20 * np.log10(np.abs(array) / np.max(np.abs(array)) + 1e-12)
 
 
 def plot_time_domain_form(audio_array: np.ndarray, sample_rate: int) -> None:
@@ -304,3 +304,107 @@ def calculate_and_plot_c80(
 
     plt.tight_layout()
     plt.show()
+
+
+def calculate_bandwise_rt60s_with_regions(audio_data: np.ndarray,
+                                          sample_rate: int, f_name: str):
+    """
+    Calculate RT60 for octave bands 64-2048 Hz using manually defined decay regions.
+
+    :param audio_data: 1D numpy array of audio samples
+    :param sample_rate: Sampling rate (Hz)
+    :param f_name: filename key to fetch decay regions from config (manual start/end times)
+
+    :return: dict mapping frequency (Hz) -> RT60 (seconds or None)
+    """
+    target_freqs = [64, 128, 256, 512, 1024, 2048]
+    regions = get_config(
+        f_name)  # Expected: list of [(start, end), ...] for mono or first channel
+    if regions is None:
+        raise ValueError(f"No regression regions found for {f_name} in config")
+
+    # If config returns list of lists for channels, take first channel only
+    if isinstance(regions[0], list) or isinstance(regions[0], tuple):
+        regions = [regions] if isinstance(regions[0][0], float) else regions[0]
+
+    rt60_results = {}
+
+    time_axis = np.linspace(0, len(audio_data) / sample_rate, len(audio_data))
+
+    plt.figure(figsize=(12, 8))
+    plt.suptitle(f"RT60 Decay Curves and Linear Fits for {f_name}")
+
+    print(
+        "Freq(Hz), Region Start(s), Region End(s), RT60(s), R², Decay Rate (dB/s)")
+
+    for idx, freq in enumerate(target_freqs, 1):
+        filtered = bandpass_filter(audio_data, freq, sample_rate,
+                                   bandwidth=freq * 0.25)
+        filtered_db = convert_to_db(filtered)
+
+        plt.subplot(3, 2, idx)
+        plt.title(f"Freq {freq} Hz")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Amplitude (dB)")
+        plt.ylim(-60, 0)
+        plt.grid(True)
+
+        freq_rt60s = []
+
+        for (t_start, t_end) in regions:
+            start_idx = int(t_start * sample_rate)
+            end_idx = int(t_end * sample_rate)
+
+            region_time = time_axis[start_idx:end_idx]
+            region_db = filtered_db[start_idx:end_idx]
+
+            # Find peaks with min prominence and min distance to catch decay peaks
+            peaks, _ = find_peaks(region_db, prominence=1.5,
+                                  distance=int(0.005 * sample_rate))
+            peak_times = region_time[peaks]
+            peak_values = region_db[peaks]
+
+            # Threshold to keep peaks above -50 dB
+            valid = peak_values > -50
+            peak_times = peak_times[valid]
+            peak_values = peak_values[valid]
+
+            if len(peak_values) < 2:
+                print(
+                    f"{freq}   ,    {t_start}-{t_end}s    : Not enough "
+                    f"peaks "
+                    f"detected.")
+                freq_rt60s.append(None)
+                continue
+
+            slope, intercept, r_value, _, _ = linregress(peak_times,
+                                                         peak_values)
+            rt60 = -60 / slope if slope < 0 else None
+            freq_rt60s.append(rt60)
+
+            # Plot data and fit line
+            plt.plot(region_time, filtered_db[start_idx:end_idx], alpha=0.3,
+                     label="Decay")
+            plt.plot(peak_times, peak_values, 'r^', label="Peaks")
+            plt.plot(region_time, slope * region_time + intercept, 'k--',
+                     label=f"Fit R²={r_value ** 2:.2f}, RT60={rt60:.2f}s" if rt60 else "Fit")
+
+            rt60_str = f"{rt60:.5f}" if rt60 else "N/A"
+
+            print(
+                f"{freq}  ,  {t_start:.3f},   {t_end:.3f}  "
+                f",{rt60_str},  {r_value ** 2:.3f}"
+                f",{slope:.3f}"
+            )
+
+        # Average RT60 across regions, ignoring None
+        valid_rt60s = [v for v in freq_rt60s if v is not None]
+        avg_rt60 = np.mean(valid_rt60s) if valid_rt60s else None
+        rt60_results[freq] = avg_rt60
+
+        plt.legend()
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()
+
+    return rt60_results
